@@ -30,6 +30,7 @@ export class AudioService {
       this.audioObj.play();
 
       const handler = (event: Event) => {
+        this.updateStateEvents(event);
         observer.next(event);
       };
 
@@ -40,6 +41,7 @@ export class AudioService {
         this.audioObj.currentTime = 0;
         // remove event listeners
         this.removeEvents(this.audioObj, this.audioEvents, handler);
+        this.resetState();
       };
     });
   }
