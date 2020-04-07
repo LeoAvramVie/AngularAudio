@@ -2,6 +2,7 @@ import {Component, OnInit} from '@angular/core';
 import {StreamState} from '../../interfaces/stream-state';
 import {AudioService} from '../../services/audio.service';
 import {CloudService} from '../../services/cloud.service';
+import {AuthService} from '../../services/auth.service';
 
 @Component({
   selector: 'app-player',
@@ -14,6 +15,7 @@ export class PlayerComponent {
   currentFile: any = {};
 
   constructor(
+    public auth: AuthService,
     public audioService: AudioService,
     public cloudService: CloudService
   ) {
