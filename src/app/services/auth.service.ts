@@ -1,10 +1,8 @@
-import {Injectable} from '@angular/core';
-import {environment} from '../../environments/environment';
-import {BehaviorSubject, bindNodeCallback, Observable, of} from 'rxjs';
-import {Router} from '@angular/router';
+import { Injectable } from '@angular/core';
 import * as auth0 from 'auth0-js';
-import {element} from 'protractor';
-
+import { environment } from '../../environments/environment';
+import { Observable, BehaviorSubject, bindNodeCallback, of } from 'rxjs';
+import { Router } from '@angular/router';
 @Injectable({
   providedIn: 'root'
 })
@@ -17,9 +15,10 @@ export class AuthService {
     redirectUri: environment.auth0.redirectUri,
     scope: 'openid profile email'
   });
+
   // Track whether or not to renew token
-  private authFlag = 'isLoggedIn';
-  private userProfileFlag = 'userProfile';
+  private _authFlag = 'isLoggedIn';
+  private _userProfileFlag = 'userProfile';
 
   // Store authentication data
   // Create stream for token
@@ -30,16 +29,16 @@ export class AuthService {
   // Authentication Navigation
   onAuthSuccessUrl = '/';
   onAuthFailureUrl = '/';
-  logoutUrl = environment.auth0.logoutUrl;
+  logoutUrl =  environment.auth0.logoutUrl;
 
-// Create observable of Auth0 parseHash method to gather auth results
+  // Create observable of Auth0 parseHash method to gather auth results
   parseHash$ = bindNodeCallback(this.auth0.parseHash.bind(this.auth0));
   // Create observable of Auth0 checkSession method to
   // verify authorization server session and renew tokens
   checkSession$ = bindNodeCallback(this.auth0.checkSession.bind(this.auth0));
 
   constructor(private router: Router) {
-    const userProfile = localStorage.getItem(this.userProfileFlag);
+    const userProfile = localStorage.getItem(this._userProfileFlag);
     if (userProfile) {
       this.userProfile$.next(JSON.parse(userProfile));
     }
@@ -51,39 +50,41 @@ export class AuthService {
     if (window.location.hash && !this.authenticated) {
       this.parseHash$().subscribe({
         next: authResult => {
-          this.setAuth(authResult);
+          this._setAuth(authResult);
           window.location.hash = '';
           this.router.navigate([this.onAuthSuccessUrl]);
         },
-        error: err => this.handleError(err)
+        error: err => this._handleError(err)
       });
     }
   }
 
-  private setAuth = authResult => {
-
+  private _setAuth = authResult => {
+    // Save authentication data and update login status subject
+    // Observable of token
     this.token$ = of(authResult.accessToken);
 
-    const userProfile = authResult.idTockenPayload;
-
+    const userProfile = authResult.idTokenPayload;
+    // Emit value for user data subject
     this.userProfile$.next(userProfile);
+    // save userProfile in localStorage
+    localStorage.setItem(this._userProfileFlag, JSON.stringify(userProfile));
 
-    localStorage.setItem(this.userProfileFlag, JSON.stringify(userProfile));
-
-    localStorage.setItem(this.authFlag, JSON.stringify(true));
+    // Set flag in local storage stating this app is logged in
+    localStorage.setItem(this._authFlag, JSON.stringify(true));
   }
 
   get authenticated(): boolean {
-    return JSON.parse(localStorage.getItem(this.authFlag));
+    return JSON.parse(localStorage.getItem(this._authFlag));
   }
 
   renewAuth() {
     if (this.authenticated) {
       this.checkSession$({}).subscribe({
-        next: authResult => this.setAuth(authResult),
+        next: authResult => this._setAuth(authResult),
         error: err => {
-          localStorage.removeItem(this.authFlag);
-          localStorage.removeItem(this.userProfileFlag);
+          localStorage.removeItem(this._authFlag);
+          localStorage.removeItem(this._userProfileFlag);
           this.router.navigate([this.onAuthFailureUrl]);
         }
       });
@@ -91,21 +92,27 @@ export class AuthService {
   }
 
   logout = () => {
-    localStorage.setItem(this.authFlag, JSON.stringify(false));
+    // Set authentication status flag in local storage to false
+    localStorage.setItem(this._authFlag, JSON.stringify(false));
+    // remove the userProfile data
+    localStorage.removeItem(this._userProfileFlag);
 
-    localStorage.removeItem(this.userProfileFlag);
-
+    // This does a refresh and redirects back to the homepage
+    // Make sure you have the logout URL in your Auth0
+    // Dashboard Application settings in Allowed Logout URLs
     this.auth0.logout({
       returnTo: this.logoutUrl,
       clientID: environment.auth0.clientID
     });
-  }
+  };
 
-  private handleError = err => {
+  // Utility functions
+
+  private _handleError = err => {
     if (err.error_description) {
-      console.error('Error: ${err.error.description]');
+      console.error(`Error: ${err.error_description}`);
     } else {
       console.error(`Error: ${JSON.stringify(err)}`);
     }
-  }
+  };
 }
